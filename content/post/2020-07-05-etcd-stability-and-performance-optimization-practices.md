@@ -6,7 +6,8 @@ date:     2020-07-05
 author:     "唐聪"
 categories: [ "Tech"]
 tags:
-    - etcd,kubernetes
+    - etcd
+    - kubernetes
 ---
 
 ​

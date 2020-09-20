@@ -6,7 +6,8 @@ date:     2020-09-19
 author:     "唐聪"
 categories: [ "Tech"]
 tags:
-    - etcd,kubernetes
+    - etcd
+    - kubernetes
 ---
 
 # etcd QoS Feature Design(draft)
@@ -262,6 +263,16 @@ tags:
  
  Add a QoS rule as shown in the example above. we will implement the QoS Rule API of add, get, update, and delete and related etcdctl QoS Rule command.
  
+ ## How to estimate NumberOfKeyScan of a read request
+ 
+ We can use the segment/interval tree to count the number of keys within the query range.  segment tree, also known as a statistic tree, is a tree data structure used for storing information about intervals, or segments. For each interval we store the number of keys in this interval.
+ 
+ For example, in the figure below, when we query a range [/a,/b], we can quickly get the number of keys.In order to control the memory overhead of segment tree, we need to introduce random algorithms for sampling statistics(to do,POC).
+ 
+ Through this statistical information, we can predict slow queries and limit the speed in advance.
+
+![segment tree](/img/segment-tree.png)
+
  
  ## Track Expensive Request
  
@@ -363,7 +374,9 @@ tags:
  2、How to shape the traffic?
  
  Fairness is not our goal, our core goal is to limit expensive requests.meanwhile,etcd node does not frequently adjust the size of cpu and memory resources and non-expensive requests will not be subject to any QoS rule. So we use multiple rate limiters to shape the expensive traffic, not k8s fair queue.
+ 
  3、How to support txn? 
+ 
  We should match operations not gRPCMethod.
  
  4、Should we need to assign a priority to each rule? How to choose a rule if multiple rules have the same priority?
