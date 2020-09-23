@@ -50,6 +50,40 @@ tags:
 * Implement the QoS Watch command to help users to set QoS Rules.
 * Automatically recognize the expensive request and limit the rate appropriately to prevent etcd from being unavailable.
  
+# Alternative Solution
+
+## Priority and Fairness & Event Ratelimiter (only for k8s apiserver)
+
+“API Priority And Fairness” is a new alpha feature in Kubernetes 1.18. Priority And Fairness permits cluster administrators to divide the concurrency of the control plane into different weighted priority levels. Based on it, we can issue rate-limiting policies for LIST operations targeting users, namespaces, and resources. 
+
+For example, k8s newbies have written tens of thousands of CRDs in a namespace. In order to prevent potential LIST operations from affecting the stability of the cluster, we can set the number of concurrent requests based on P&R, but the disadvantage is that apiserver does not know how many resources that etcd will return. if the user cleans up most of the Resources, the administrator also needs to manually increase the number of concurrent requests for this resource.(please correct me if i am wrong).
+
+ in etcd QoS Feature, The rate limit will take effect only when NumberOfKeyScan is greater than a higher threshold. Therefore, if a client lists resources through the API without paging, even if the API Server allows a large number of concurrent requests, etcd will limit the rate.
+
+Another problem that needs to be solved is the k8s event.
+
+“EventRateLimit” is a new alpha admission controller in Kubernetes 1.13.it can mitigate the problem where the API server gets flooded by event requests.  
+
+ in etcd QoS Feature, The rate limit will take effect when PercentOfStorageQuotaUsed is greater than a higher threshold. If necessary,we can even refuse to write events when the number of events is greater than the threshold.
+
+These will be a complement to P&R capabilities.
+
+P&R is only for k8s apiserver, clients in other scenarios (such as configuration center, service discovery and scheduler services) also have the slowquery problem. In kubernetes,In order to avoid list resources, each component has done a lot of optimization and speed limit,but other clients do not have it, so slow queries are very common.
+
+## QoS based on gRPC Proxy
+
+Some companies, such as Alibaba, implement the etcd QoS Feature at the etcd proxy layer, it is not in the server. The advantage is that it is easy to develop and maintain and it allows experimentation without changing the etcd server binary. The disadvantage is that one more component is introduced, and the availability of etcd may decrease.
+
+Most users do not use proxy, and at the same time, we cannot estimate the cost of a query request in proxy and don't know the percentage of db size used, etc, which will lead to poor QoS rule expansion.
+
+## QoS based on etcd
+
+Next, I will introduce a solution based on etcd to implement QoS, which has the feature of flexibility and strong scalability.
+
+This Feature will be introduced behind an experimental flag. If you do not enable the experimental flag, etcd QoS API is not available and will not create related buckets for QoS in boltdb.
+
+In order to ensure its accuracy, we will implement unit testing, e2e testing, integration testing, and the most important thing is the accuracy of the speed limit. We can implement a mini-benchmark, run multiple test cases, and obtain the mean, standard deviation, and variance. Then judge whether the QPS is accurate and the error is within the allowable range based on variance.
+
  
 # Proposal
 
